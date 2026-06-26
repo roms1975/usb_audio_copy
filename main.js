@@ -6,10 +6,26 @@ const { exec } = require('child_process');
 let mainWindow;
 let knownDrives = new Set();
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.m4a']);
-const TARGET_DIR = path.join(__dirname, 'audio');
 
+// ПРАВИЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ ПУТИ ДЛЯ PORTABLE EXE:
+let EXE_DIR;
+if (app.isPackaged) {
+    // Если это Portable EXE, берем путь, откуда его запустил пользователь.
+    // Если это обычная сборка, берем директорию самого процесса.
+    EXE_DIR = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe'));
+} else {
+    EXE_DIR = __dirname; // Режим разработки
+}
+
+const TARGET_DIR = path.join(EXE_DIR, 'audio');
+
+// Создаем папку "audio" на реальном диске
 if (!fs.existsSync(TARGET_DIR)) {
-    fs.mkdirSync(TARGET_DIR, { recursive: true });
+    try {
+        fs.mkdirSync(TARGET_DIR, { recursive: true });
+    } catch (e) {
+        console.error("Не удалось создать папку audio:", e);
+    }
 }
 
 function createWindow() {

@@ -1,19 +1,30 @@
 {
-  "name": "usb_audio_copy",
+  "name": "usb-audio-scanner",
   "version": "1.0.0",
-  "description": "",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder --windows"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "electron": "^13.6.9",
     "electron-builder": "^22.14.13"
   },
-  "dependencies": {
-    "drivelist": "^11.0.0"
+  "build": {
+    "appId": "com.usb.audioscanner",
+    "productName": "USBAudioScanner",
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html"
+    ],
+    "directories": {
+      "output": "dist"
+    }
   }
 }
