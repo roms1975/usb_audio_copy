@@ -32,7 +32,8 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 800,
         height: 600,
-        show: false, // Не показываем окно, пока оно не загрузит HTML
+        show: false,
+        icon: path.join(__dirname, 'icon.ico'), // <--- ДОБАВЬТЕ ЭТУ СТРОКУ
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -42,12 +43,8 @@ function createWindow() {
 
     mainWindow.loadFile('index.html');
 
-    // Показываем окно только тогда, когда интерфейс полностью готов
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
-        console.log('Окно успешно отображено. Запускаем мониторинг флешек...');
-        
-        // СТРОГО ПОСЛЕ ПОКАЗА ОКНА запускаем проверку каждые 2 секунды
         setInterval(checkDrives, 2000);
     });
 }
