@@ -1,7 +1,11 @@
+require('dotenv').config();
+
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
+const axios = require('axios');
+const FormData = require('form-data');
 
 let mainWindow;
 let knownDrives = new Set();
@@ -24,7 +28,7 @@ if (!fs.existsSync(TARGET_DIR)) {
     try {
         fs.mkdirSync(TARGET_DIR, { recursive: true });
     } catch (e) {
-        console.error("Не удалось создать папку audio:", e);
+        console.error("Fail to create folder audio:", e);
     }
 }
 
@@ -45,6 +49,7 @@ function createWindow() {
 
     mainWindow.once('ready-to-show', () => {
         mainWindow.show();
+		//mainWindow.webContents.openDevTools();
         setInterval(checkDrives, 2000);
     });
 }
@@ -86,7 +91,14 @@ function scanAudioFiles(dirPath) {
                     });
 
                     fs.copyFile(resPath, destPath, (err) => {
-                        if (err) console.error(`Ошибка копирования ${finalName}:`, err);
+                        if (err) {
+                            console.error(`Copy file error ${finalName}:`, err);
+                        } else {
+                            console.log(`[Local] has been copy: ${finalName}`);
+                            
+                            // ВЫЗЫВАЕМ МЕТОД ОТПРАВКИ НА СЕРВЕР ПОСЛЕ УСПЕШНОГО КОПИРОВАНИЯ
+                            uploadFileToServer(destPath, finalName);
+                        }
                     });
                 }
             }
@@ -126,6 +138,56 @@ function checkDrives() {
 
         knownDrives = currentRemovableSet;
     });
+}
+
+async function uploadFileToServer(filePath, fileName) {
+	const apiURL = process.env.API_URL; 
+    const token = process.env.API_TOKEN;
+	
+	if (!apiURL || !token) {
+        console.error('[API Error] Envirement variables API_URL or API_TOKEN not set in .env');
+        return;
+    }
+
+    try {
+        // Создаем форму для отправки бинарных данных (multipart/form-data)
+        const form = new FormData();
+		
+		// Очищаем имя от пробелов и спецсимволов для безопасной передачи в HTTP-заголовке
+		const safeApiName = fileName
+			.replace(/[^a-zA-Z0-9\._\-]/g, '_') // Заменяем все странные символы на подчеркивание
+			.replace(/_{2,}/g, '_'); 
+				
+        // Считываем файл в виде потока (stream) — это не грузит оперативную память
+        form.append('file', fs.createReadStream(filePath), {
+            filename: safeApiName
+        });
+		form.append('original_name', fileName);
+
+        console.log(`[API] Start upload: ${fileName}`);
+
+        // Выполняем POST запрос по аналогии с REST API методами
+        const response = await axios.post(apiURL, form, {
+            headers: {
+                ...form.getHeaders(), // Автоматически выставит boundary и Content-Type
+                'Authorization': `Bearer ${token}` // Передаем токен в заголовках
+            },
+            maxContentLength: Infinity, // Снимаем ограничения на размер файла
+            maxBodyLength: Infinity
+        });
+
+        if (response.status === 200 || response.status === 201) {
+            console.log(`[API] Success file upload: ${fileName}`);
+            // Можно отправить статус "Загружен на сервер" в интерфейс Electron
+            // mainWindow.webContents.send('upload-success', fileName);
+        }
+    } catch (error) {
+        console.error(`[API Error] Fail upload file ${fileName}:`, error.message);
+        if (error.response) {
+            // Сервер ответил кодом ошибки (например, 400, 401, 500)
+            console.error(`[API Server response]:`, error.response.data);
+        }
+    }
 }
 
 app.whenReady().then(() => {
