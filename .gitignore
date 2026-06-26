@@ -1,0 +1,13 @@
+# Зависимости (самая тяжелая папка)
+node_modules/
+
+# Папка с готовой сборкой .exe
+dist/
+
+# Папка, куда копируется музыка при тестах
+audio/
+
+# Логи ошибок npm
+npm-debug.log
+yarn-debug.log
+yarn-error.log

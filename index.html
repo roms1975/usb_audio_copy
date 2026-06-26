@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>USB Audio Scanner</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #202124; color: #fff; padding: 20px; }
+        .status { color: #8ab4f8; margin-bottom: 20px; font-weight: bold; }
+        ul { list-style-type: none; padding: 0; }
+        li { background: #303134; padding: 10px; margin: 5px 0; border-radius: 4px; font-size: 14px; }
+        .path { color: #9aa0a6; font-size: 11px; display: block; }
+    </style>
+</head>
+<body>
+    <h1>Сканер USB Аудио</h1>
+    <div id="status" class="status">Ожидание подключения флешки...</div>
+    <h2>Найденные треки:</h2>
+    <ul id="file-list"></ul>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const fileList = document.getElementById('file-list');
+
+        window.electronAPI.onUsbConnected((driveLetter) => {
+            statusDiv.innerText = `Обнаружена флешка (${driveLetter}). Сканирование...`;
+            fileList.innerHTML = ''; 
+        });
+
+        window.electronAPI.onAudioFound((file) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${file.name}</strong> <span class="path">${file.path}</span>`;
+            fileList.appendChild(li);
+        });
+    </script>
+</body>
+</html>
