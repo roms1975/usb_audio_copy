@@ -10,6 +10,7 @@ const FormData = require('form-data');
 let mainWindow;
 let knownDrives = new Set();
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg', '.m4a']);
+var badge = '';
 
 // ПРАВИЛЬНЫЙ ОПРЕДЕЛИТЕЛЬ ПУТИ ДЛЯ PORTABLE EXE:
 let EXE_DIR;
@@ -61,47 +62,16 @@ function scanAudioFiles(dirPath) {
 
         for (const file of files) {
             const resPath = path.join(dirPath, file.name);
-            if (file.isDirectory()) {
-                scanAudioFiles(resPath);
-            } else {
-                const ext = path.extname(file.name).toLowerCase();
-                if (AUDIO_EXTENSIONS.has(ext)) {
-                    const srcStats = fs.statSync(resPath);
-                    let destPath = path.join(TARGET_DIR, file.name);
-                    let finalName = file.name;
+			const ext = path.extname(file.name).toLowerCase();
+			if (AUDIO_EXTENSIONS.has(ext)) {
+				mainWindow.webContents.send('audio-found', {
+					name: file.name,
+					path: resPath
+				});
 
-                    if (fs.existsSync(destPath)) {
-                        const destStats = fs.statSync(destPath);
-                        if (srcStats.size === destStats.size) {
-                            continue; 
-                        }
-
-                        const baseName = path.basename(file.name, ext);
-                        let counter = 1;
-                        while (fs.existsSync(destPath)) {
-                            finalName = `${baseName} (${counter})${ext}`;
-                            destPath = path.join(TARGET_DIR, finalName);
-                            counter++;
-                        }
-                    }
-
-                    mainWindow.webContents.send('audio-found', {
-                        name: finalName,
-                        path: resPath
-                    });
-
-                    fs.copyFile(resPath, destPath, (err) => {
-                        if (err) {
-                            console.error(`Copy file error ${finalName}:`, err);
-                        } else {
-                            console.log(`[Local] has been copy: ${finalName}`);
-                            
-                            // ВЫЗЫВАЕМ МЕТОД ОТПРАВКИ НА СЕРВЕР ПОСЛЕ УСПЕШНОГО КОПИРОВАНИЯ
-                            uploadFileToServer(destPath, finalName);
-                        }
-                    });
-                }
-            }
+				// ВЫЗЫВАЕМ МЕТОД ОТПРАВКИ НА СЕРВЕР ПОСЛЕ УСПЕШНОГО КОПИРОВАНИЯ
+				uploadFileToServer(resPath, file.name, badge);
+			}
         }
     } catch (err) {
         // Пропускаем папки без доступа
@@ -130,6 +100,11 @@ function checkDrives() {
 
             if (!knownDrives.has(mountPath)) {
                 mainWindow.webContents.send('usb-connected', mountPath);
+				badge = get_badge(mountPath);
+				if (!badge) {
+					console.log(`The badge.json file is missing or the badge.json file contains invalid data`);
+					return;
+				}
                 setTimeout(() => {
                     scanAudioFiles(mountPath);
                 }, 1500);
@@ -140,9 +115,26 @@ function checkDrives() {
     });
 }
 
-async function uploadFileToServer(filePath, fileName) {
-	const apiURL = process.env.API_URL; 
-    const token = process.env.API_TOKEN;
+function get_badge(mountPath) {
+	try {
+		let badge_path = mountPath + 'badge.json';
+        if (!fs.existsSync(badge_path)) {
+			return false;
+		}
+        let fileContent = fs.readFileSync(badge_path, 'utf-8');
+		let data = JSON.parse(fileContent);
+		console.log(`badge %o`, data);
+		return data;
+	} catch (error) {
+		return false;
+	}
+}
+
+async function uploadFileToServer(filePath, fileName, badge) {
+	// const apiURL = process.env.API_URL; 
+    // const token = process.env.API_TOKEN;
+	const apiURL = 'https://z8.fpg.ru/b9/api/v2/upload.php'; 
+    const token = '4fbf1db640bf7dd37300af3f6db20841';
 	
 	if (!apiURL || !token) {
         console.error('[API Error] Envirement variables API_URL or API_TOKEN not set in .env');
@@ -165,6 +157,23 @@ async function uploadFileToServer(filePath, fileName) {
 		form.append('original_name', fileName);
 
         console.log(`[API] Start upload: ${fileName}`);
+		
+		if (badge && typeof badge === 'object') {
+            for (const key in badge) {
+                if (badge.hasOwnProperty(key)) {
+                    // Переводим значение в строку, так как FormData принимает только строки или бинарные данные
+                    const value = typeof badge[key] === 'object' 
+                        ? JSON.stringify(badge[key]) 
+                        : String(badge[key]);
+                        
+                    form.append(key, value); 
+                    // Например, если в bage.json было { "owner": "Ivan" }, то добавится поле owner со значением Ivan
+                }
+            }
+        } else {
+			console.log(`No badge, exit`);
+			return;
+		}
 
         // Выполняем POST запрос по аналогии с REST API методами
         const response = await axios.post(apiURL, form, {
@@ -178,6 +187,7 @@ async function uploadFileToServer(filePath, fileName) {
 
         if (response.status === 200 || response.status === 201) {
             console.log(`[API] Success file upload: ${fileName}`);
+			//console.log('[API Ответ сервера]:', response.data); 
             // Можно отправить статус "Загружен на сервер" в интерфейс Electron
             // mainWindow.webContents.send('upload-success', fileName);
         }
