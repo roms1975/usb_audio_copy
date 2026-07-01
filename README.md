@@ -5,3 +5,9 @@
 2. Run the file by double-clicking it; you will see the application window.
 3. Insert a USB storage device.
 4. The app will find the audio files, create an "audio" folder, and copy them into this folder (only new files will be copied).
+
+## Run by npm
+1. npm start
+
+## Build exe from source
+1. npm run dist
