@@ -11,3 +11,5 @@
 
 ## Build exe from source
 1. npm run dist
+2. If the build is successful, a dist folder will be created
+3. The required ***USBAudioScanner*** 1.0.1.exe file will be in the dist folder
